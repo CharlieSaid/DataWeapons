@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lego Store Overview</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Pinned to specific version for security (check for updates regularly) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3"></script>
+    <script>
+        // Ensure Supabase is available globally
+        window.supabaseReady = false;
+        if (typeof supabase !== 'undefined') {
+            window.supabase = supabase;
+            window.supabaseReady = true;
+        }
+    </script>
+</head>
+<body>
+    <header>
+        <nav>
+            <a href="index.html" class="active">Home</a>
+            <a href="about.html">About</a>
+            <a href="advanced.html">Advanced</a>
+            <div class="account-menu" id="account-menu" style="display: none;">
+                <div class="account-icon" id="account-icon">👤</div>
+                <div class="account-dropdown" id="account-dropdown">
+                    <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e9ecef; font-weight: 500;">
+                        <div id="account-email" style="font-size: 0.9rem; color: #666;"></div>
+                    </div>
+                    <button id="logout-menu-btn">Log Out</button>
+                    <hr>
+                    <button class="delete-account" id="delete-account-btn">Delete Account</button>
+                </div>
+            </div>
+        </nav>
+    </header>
+    
+    <main>
+        <h1>Lego Store Overview</h1>
+        <div id="data-container">
+            <p>Loading data...</p>
+        </div>
+    </main>
+    
+    <script type="module" src="script.js"></script>
+</body>
+</html>
