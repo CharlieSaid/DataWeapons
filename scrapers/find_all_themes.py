@@ -204,17 +204,30 @@ async def find_all_themes() -> List[Dict[str, Any]]:
         return return_data
 
 if __name__ == "__main__":
-    return_data = asyncio.run(find_all_themes())
-    df = pd.DataFrame(return_data)
+    import sys
     
-    if not df.empty:
+    try:
+        print("Starting find_all_themes scraper...")
+        return_data = asyncio.run(find_all_themes())
+        
+        if not return_data:
+            print("⚠️  Warning: No themes found. This might indicate a scraping issue.")
+            sys.exit(1)  # Exit with error if no data found
+        
+        df = pd.DataFrame(return_data)
+        print(f"Found {len(df)} themes")
+        
         # Save to CSV as backup
-        print(f"Saving {len(df)} themes to themes_list.csv.")
-        df.to_csv("themes_list.csv", index=False)
-        if os.path.exists("themes_list.csv"):
-            print("themes_list.csv saved successfully")
+        csv_path = "themes_list.csv"
+        print(f"Saving {len(df)} themes to {csv_path}.")
+        print(f"Current working directory: {os.getcwd()}")
+        df.to_csv(csv_path, index=False)
+        if os.path.exists(csv_path):
+            print(f"✅ {csv_path} saved successfully at {os.path.abspath(csv_path)}")
         else:
-            print("themes_list.csv was not saved - investigate!")
+            print(f"❌ {csv_path} was not saved - investigate!")
+            print(f"   Expected path: {os.path.abspath(csv_path)}")
+            sys.exit(1)
         
         # Save to Supabase
         supabase = get_supabase_client()
@@ -224,7 +237,17 @@ if __name__ == "__main__":
                 print("✅ Themes successfully saved to Supabase")
             else:
                 print("❌ Failed to save themes to Supabase")
+                sys.exit(1)  # Exit with error if Supabase save fails
         else:
             print("⚠️  Supabase client not available, skipping database write")
-    else:
-        print("No themes were found to save to themes_list.csv")
+            print("   Make sure SUPABASE_URL and SUPABASE_KEY environment variables are set")
+            # Don't exit with error if Supabase is unavailable - CSV backup is still saved
+        
+        print("✅ Scraper completed successfully")
+        sys.exit(0)
+        
+    except Exception as e:
+        print(f"❌ Error running scraper: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
