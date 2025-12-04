@@ -6,3 +6,4 @@ matplotlib==3.7.2
 seaborn==0.12.2
 lxml==4.9.3
 supabase==2.3.4
+playwright==1.40.0

@@ -47,15 +47,11 @@ async def check_pov_custom(item_numbers: List[str]):
             # Polite wait
             await page.wait_for_timeout(WAIT_TIME_MEDIUM)
 
-            # await handle_age_gate(page)
-            # await handle_cookie_consent(page)
 
             soup = BeautifulSoup(await page.content(), "html.parser")
 
             all_text = soup.find_all('font')
 
-            # for line in all_text:
-            #     print(line.get_text())
 
             item_info.append(parese_results_to_table(all_text, item_number))
     return item_info
@@ -76,6 +72,7 @@ def parese_results_to_table(results: List[str], item_number: str) -> Dict[str, A
     print('Parsing results...')
 
     for line in results:
+        print(line)
         line_text = line.get_text()
         if '$' in line_text:
             if pov_past_6_months is None:
@@ -104,27 +101,23 @@ if __name__ == "__main__":
     
     # open lego_store_overview.csv
     sets_df = pd.read_csv("lego_store_overview.csv")
-    
+    print("inital set count: ", len(sets_df))
 
     # Remove duplicate rows
     sets_df = sets_df.drop_duplicates(keep='first')
-
     # Drop rows where the item_number is None
     sets_df = sets_df[sets_df['item_number'].notna()]
-
     sets_df = sets_df[sets_df['piece_count'] != 'Piece count not found']
-
     # Convert piece_count to int
     sets_df['piece_count'] = sets_df['piece_count'].astype(int)
-
     # Drop rows where piece count is < 100
     sets_df = sets_df[sets_df['piece_count'] >= 10]
 
-    print(len(sets_df))
+    print("cleaned set count: ", len(sets_df))
 
     item_numbers = sets_df["item_number"].tolist()
     
-    results_table = asyncio.run(check_pov_custom(item_numbers))
+    results_table = asyncio.run(check_pov_custom(item_numbers[1:5]))
     pov_df = pd.DataFrame(results_table)
 
     # Join the pov_df with the sets_df on the item_number column

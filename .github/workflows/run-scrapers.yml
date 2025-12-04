@@ -27,8 +27,8 @@ jobs:
       
       - name: Install Playwright browsers
         run: |
-          playwright install chromium
-          playwright install-deps chromium
+          python3 -m playwright install chromium
+          python3 -m playwright install-deps chromium
       
       - name: Run find_all_themes scraper
         env:
@@ -36,7 +36,7 @@ jobs:
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         working-directory: ./scrapers
         run: |
-          python find_all_themes.py
+          python3 find_all_themes.py
       
       - name: Upload logs on failure
         if: failure()
