@@ -279,6 +279,9 @@ async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]
                             # Find product name
                             name_element = set_item.find('h3')
                             set_name = name_element.get_text(strip=True) if name_element else "Unknown"
+
+                            availability_element = set_item.find("div", attrs={"data-test": "product-leaf-action-row"})
+                            availability = availability_element.get_text(strip=True) if availability_element else "Unknown"
                             
                             # Find price
                             price_element = set_item.find('div', class_="ProductLeaf_priceRow__kwpxi")
@@ -290,7 +293,7 @@ async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]
                                 sale_price = None
                                 continue
 
-                            # Determine the number of elements in the price_element
+                            # Check if price_element contains a discount percentage (a sale price)
                             if "%" in price_element.get_text(strip=True):
                                 base_price = price_element.get_text(strip=True)
 
@@ -306,6 +309,19 @@ async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]
                                     msrp = None
                                     sale_price = None
                                     discount_percentage = None
+                            
+                            elif "Insiders" in price_element.get_text(strip=True):
+                                # Regex function to extract the msrp (the first number that ends in .99) and the sale price (the immediately following number that ends in .99)
+                                print(f"Insiders price element: {price_element.get_text(strip=True)}")
+                                pattern = r'(\$\d+\.\d{2})(\$\d+\.\d{2})'
+                                match = re.match(pattern, price_element.get_text(strip=True))
+                                if match:
+                                    msrp = match.group(1)
+                                    sale_price = match.group(2)
+                                else:
+                                    print(f"Could not parse base price: {price_element.get_text(strip=True)}")
+                                    msrp = None
+
 
                             else:
                                 msrp = price_element.get_text(strip=True)
@@ -322,6 +338,7 @@ async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]
                                 "set_name": set_name,
                                 "msrp": msrp,
                                 "sale_price": sale_price,
+                                "availability": availability,
                                 "piece_count": piece_count,
                                 "url": url,
                                 "item_number": item_number

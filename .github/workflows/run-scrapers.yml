@@ -12,10 +12,10 @@ jobs:
     
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
           cache: 'pip'  # Cache pip dependencies for faster runs
@@ -30,17 +30,17 @@ jobs:
           playwright install chromium
           playwright install-deps chromium
       
-      - name: Run all scrapers
+      - name: Run find_all_themes scraper
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
         working-directory: ./scrapers
         run: |
-          python run_all_scrapers.py
+          python find_all_themes.py
       
       - name: Upload logs on failure
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: scraper-logs-${{ github.run_id }}
           path: |
@@ -50,7 +50,7 @@ jobs:
       
       - name: Upload logs on success
         if: success()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: scraper-logs-${{ github.run_id }}
           path: scrapers/*.csv

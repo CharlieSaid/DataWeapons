@@ -188,7 +188,7 @@ async def find_all_themes() -> List[Dict[str, Any]]:
 
         # Find all the themes
 
-        theme_elements = soup.find_all('a', attrs={"class": "Linksstyles__Anchor-sc-684acv-0 friqQc CategoryLeafstyles__ImagesLink-sc-2bwko3-4 lfBWXz", "href": True})
+        theme_elements = soup.find_all('a', attrs={"class": "Linksstyles__Anchor-sc-83wpk9-0 dfbGrg CategoryLeafstyles__DetailsLink-sc-2bwko3-14 hTmaUD", "href": True, "data-test": "themes-link"})
         for theme_element in theme_elements:
             theme_name = theme_element.get('href').split('/')[-1]
             print(f"Found theme: {theme_name}")
