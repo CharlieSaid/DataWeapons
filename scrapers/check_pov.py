@@ -6,6 +6,7 @@ from typing import List, Dict, Any, Optional
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import pandas as pd
+import re
 
 # Import supabase_client
 try:
@@ -52,6 +53,9 @@ async def check_pov_custom(item_numbers: List[str]):
 
             all_text = soup.find_all('font')
 
+            for text in all_text:
+                print(text.get_text())
+
 
             item_info.append(parese_results_to_table(all_text, item_number))
     return item_info
@@ -71,8 +75,8 @@ def parese_results_to_table(results: List[str], item_number: str) -> Dict[str, A
 
     print('Parsing results...')
 
+
     for line in results:
-        print(line)
         line_text = line.get_text()
         if '$' in line_text:
             if pov_past_6_months is None:
@@ -80,13 +84,13 @@ def parese_results_to_table(results: List[str], item_number: str) -> Dict[str, A
             else:
                 pov_current_listings = line_text
         
-        if 'Including' in line:
+        if 'Including' in line_text:
             if pov_past_6_months_volume is None:
-                pov_past_6_months_volume = line_text.split(sep = ' ')[1]
+                pov_past_6_months_volume = line_text.split(sep = ' ')[1] + '|' + line_text.split(sep = ' ')[4]
             else:
-                pov_current_listings_volume = line_text.split(sep = ' ')[1]
+                pov_current_listings_volume = line_text.split(sep = ' ')[1] + '|' + line_text.split(sep = ' ')[4]
     print('--------------------------------')
-    print(f"POV for {item_number}: {pov_past_6_months} - {pov_current_listings}")
+    print(f"POV for {item_number}: {pov_past_6_months} - {pov_current_listings} with volumes {pov_past_6_months_volume} - {pov_current_listings_volume}")
     print('--------------------------------')
     return {
                 "item_number": item_number,

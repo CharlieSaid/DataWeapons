@@ -150,6 +150,11 @@ async def find_all_themes() -> List[Dict[str, Any]]:
         await navigate_to_page(page, BASE_URL)
 
         content = await page.content()
+        if content:
+            print(f"Content found!")
+        else:
+            print("No content found")
+           
 
 
         # Debug: Check what's actually on the page
@@ -169,6 +174,8 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             soup = BeautifulSoup(content, "html.parser")
             real_url = page.url
             print(f"After age gate handling, URL: {real_url}")
+        else:
+            print("No age gate found")
             
         if 'consent-modal' in real_url:
             print('Cookie consent encountered!')
@@ -182,13 +189,18 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             soup = BeautifulSoup(content, "html.parser")
             real_url = page.url
             print(f"After cookie consent handling, URL: {real_url}")
+        else:
+            print("No cookie consent found")
 
 
         soup = BeautifulSoup(content, "html.parser")
 
         # Find all the themes
 
-        theme_elements = soup.find_all('a', attrs={"class": "Linksstyles__Anchor-sc-83wpk9-0 dfbGrg CategoryLeafstyles__DetailsLink-sc-2bwko3-14 hTmaUD", "href": True, "data-test": "themes-link"})
+    
+        theme_elements = soup.find_all('a', attrs={"class": "sc-99390ee5-0 iqhEUq sc-c51a6d83-4 eZQczn", "href": True})
+        print(f"Found {len(theme_elements)} theme elements")
+
         for theme_element in theme_elements:
             theme_name = theme_element.get('href').split('/')[-1]
             print(f"Found theme: {theme_name}")
@@ -231,6 +243,7 @@ if __name__ == "__main__":
         
         # Save to Supabase
         supabase = get_supabase_client()
+        print(f"Supabase client: {supabase}")
         if supabase:
             success = upsert_themes(supabase, return_data)
             if success:

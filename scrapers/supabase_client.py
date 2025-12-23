@@ -5,6 +5,35 @@ import os
 from supabase import create_client, Client
 from typing import Optional
 
+# Try to load from .env file if python-dotenv is available
+try:
+    from dotenv import load_dotenv
+    
+    # Determine project root: go up from scrapers/ directory
+    script_dir = os.path.dirname(os.path.abspath(__file__))  # scrapers/ directory
+    project_root = os.path.dirname(script_dir)  # project root
+    env_path = os.path.join(project_root, '.env')
+    
+    # Try to load from project root first
+    if os.path.exists(env_path):
+        load_dotenv(env_path, override=True)
+        print(f"✅ Loaded .env file from {env_path}")
+    else:
+        # Fallback: try current working directory
+        cwd_env = os.path.join(os.getcwd(), '.env')
+        if os.path.exists(cwd_env):
+            load_dotenv(cwd_env, override=True)
+            print(f"✅ Loaded .env file from {cwd_env}")
+        else:
+            print(f"⚠️  .env file not found at {env_path} or {cwd_env}")
+            print(f"   Script dir: {script_dir}")
+            print(f"   Project root: {project_root}")
+            print(f"   Current dir: {os.getcwd()}")
+except ImportError:
+    # python-dotenv not installed
+    print("⚠️  python-dotenv not installed. Install with: pip install python-dotenv")
+    print("   Or set SUPABASE_KEY environment variable directly.")
+
 # Supabase configuration
 SUPABASE_URL = os.getenv('SUPABASE_URL', 'https://uxdqrswbcgkkftvompwd.supabase.co')
 SUPABASE_KEY = os.getenv('SUPABASE_KEY')  # Service role key for write operations
