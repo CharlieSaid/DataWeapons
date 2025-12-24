@@ -28,20 +28,34 @@ def main():
         print("-" * 60)
         themes_data = asyncio.run(find_all_themes())
         
-        if not themes_data:
-            print("⚠️  No themes found. Continuing with existing themes_list.csv if available.")
-        else:
+        # Extract theme names for scrape_lego()
+        theme_names = None
+        if themes_data:
             print(f"✅ Found {len(themes_data)} themes")
-            # Save themes to CSV file for next scraper
+            # Save themes to CSV file for backup
             themes_df = pd.DataFrame(themes_data)
             csv_path = "themes_list.csv"
             themes_df.to_csv(csv_path, index=False)
             print(f"✅ Saved {len(themes_df)} themes to {csv_path}")
+            # Extract theme names to pass directly to scrape_lego()
+            theme_names = [theme['theme_name'] for theme in themes_data]
+        else:
+            print("⚠️  No themes found. Checking for existing themes_list.csv...")
+            # Fallback: try to use existing CSV if available
+            if os.path.exists("themes_list.csv"):
+                print("✅ Found existing themes_list.csv, will use it")
+                themes_df = pd.read_csv("themes_list.csv")
+                theme_names = themes_df["theme_name"].tolist()
+                print(f"✅ Loaded {len(theme_names)} themes from existing CSV")
+            else:
+                print("❌ No themes found and no existing themes_list.csv available")
+                print("   Cannot proceed with scraping LEGO sets without themes")
+                return 1
         
-        # Step 2: Scrape LEGO overview (uses themes_list.csv)
+        # Step 2: Scrape LEGO overview (pass themes directly)
         print("\n[2/3] Running scrape_lego_overview...")
         print("-" * 60)
-        sets_data = asyncio.run(scrape_lego())
+        sets_data = asyncio.run(scrape_lego(themes=theme_names))
         
         if not sets_data:
             print("⚠️  No sets found.")

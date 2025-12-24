@@ -168,10 +168,6 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             # After handling age gate, we need to navigate to the actual page
 
             await navigate_to_page(page, BASE_URL)
-
-            # Get fresh content after navigation
-            content = await page.content()
-            soup = BeautifulSoup(content, "html.parser")
             real_url = page.url
             print(f"After age gate handling, URL: {real_url}")
         else:
@@ -181,34 +177,96 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             print('Cookie consent encountered!')
             await handle_cookie_consent(page)
             # After handling cookie consent, we need to navigate to the actual page
-
             await navigate_to_page(page, BASE_URL)
-            
-            # Get fresh content after navigation
-            content = await page.content()
-            soup = BeautifulSoup(content, "html.parser")
             real_url = page.url
             print(f"After cookie consent handling, URL: {real_url}")
         else:
             print("No cookie consent found")
 
+        # Wait for page to be fully loaded and theme elements to appear
+        # Try multiple selectors in case the page structure changed
+        try:
+            # Wait for any theme link to appear (more reliable than waiting for specific class)
+            await page.wait_for_selector('a[href*="/themes/"][data-test="themes-link"]', timeout=PAGE_LOAD_TIMEOUT)
+            print("Theme elements detected on page")
+        except Exception as e:
+            print(f"Warning: Could not find theme elements with data-test selector: {e}")
+            # Try alternative: wait for any link containing /themes/
+            try:
+                await page.wait_for_selector('a[href*="/themes/"]', timeout=10000)
+                print("Found theme links with alternative selector")
+            except Exception as e2:
+                print(f"Warning: Could not find theme links with alternative selector: {e2}")
+
+        # Wait a bit more for JavaScript to fully render
+        await page.wait_for_timeout(WAIT_TIME_MEDIUM)
+
+        # Get fresh content after all navigation and waiting
+        content = await page.content()
+        if content:
+            print(f"Content found! Content length: {len(content)}")
+        else:
+            print("No content found")
+            await browser.close()
+            return return_data
 
         soup = BeautifulSoup(content, "html.parser")
 
-        # Find all the themes
-
-    
-        theme_elements = soup.find_all('a', attrs={"class": "sc-99390ee5-0 iqhEUq sc-c51a6d83-4 eZQczn", "href": True})
+        # Find all the themes - try multiple selectors for robustness
+        # First try the data-test attribute (most reliable)
+        theme_elements = soup.find_all('a', attrs={"data-test": "themes-link", "href": True})
+        
+        # If that doesn't work, try the class-based selector
+        if len(theme_elements) == 0:
+            print("No themes found with data-test selector, trying class-based selector...")
+            theme_elements = soup.find_all('a', attrs={"class": "sc-99390ee5-0 iqhEUq sc-c51a6d83-4 eZQczn", "href": True})
+        
+        # If still nothing, try a more generic selector (any link to /themes/)
+        if len(theme_elements) == 0:
+            print("No themes found with class selector, trying generic /themes/ link selector...")
+            all_links = soup.find_all('a', href=True)
+            theme_elements = [link for link in all_links if '/themes/' in link.get('href', '') and link.get('href', '').count('/') >= 4]
+        
         print(f"Found {len(theme_elements)} theme elements")
 
+        # Extract theme names, filtering out invalid ones
         for theme_element in theme_elements:
-            theme_name = theme_element.get('href').split('/')[-1]
+            href = theme_element.get('href', '')
+            if not href:
+                print(f"Skipping because no href")
+                continue
+            
+            # Extract theme name from URL (e.g., /en-us/themes/star-wars -> star-wars)
+            theme_name = href.rstrip('/').split('/')[-1]
+            
+            # Skip if theme_name is empty or looks invalid
+            if not theme_name or theme_name in ['themes', 'en-us', '']:
+                print(f"Skipping invalid theme name: {theme_name} because it looks invalid")
+                continue
+            
+            # Skip if it's not a valid theme URL (should be a single word/slug)
+            if '?' in theme_name or '#' in theme_name or '=' in theme_name:
+                print(f"Skipping invalid theme name: {theme_name} because it contains invalid characters")
+                continue
+            
             print(f"Found theme: {theme_name}")
             return_data.append({
                 "theme_name": theme_name,
-                "theme_url": theme_element.get('href')
+                "theme_url": href if href.startswith('http') else f"https://www.lego.com{href}"
             })
-        print(f"Found {len(theme_elements)}")
+        
+        print(f"Found {len(return_data)} valid themes")
+        
+        # If no themes found, save HTML for debugging (especially useful in CI)
+        if len(return_data) == 0:
+            print("⚠️  No themes found! Saving HTML for debugging...")
+            os.makedirs("html_files", exist_ok=True)
+            html_path = "html_files/themes_page_no_results.html"
+            with open(html_path, "w", encoding='utf-8') as f:
+                f.write(content)
+            print(f"HTML saved to {html_path} for inspection")
+            print(f"Page URL was: {real_url}")
+            print(f"Content length: {len(content)} characters")
                     
         await browser.close()
         print('Browser closed!')
