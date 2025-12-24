@@ -136,26 +136,90 @@ async def find_all_themes() -> List[Dict[str, Any]]:
     
     
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=True)
-        page = await browser.new_page()
+        # Launch browser with stealth settings
+        browser = await p.chromium.launch(
+            headless=True,
+            args=[
+                '--disable-blink-features=AutomationControlled',  # Remove automation flags
+                '--disable-dev-shm-usage',
+                '--no-sandbox',
+                '--disable-setuid-sandbox',
+                '--disable-web-security',
+                '--disable-features=IsolateOrigins,site-per-process',
+            ]
+        )
         
-        await page.set_extra_http_headers({
-            "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8"
-        })
+        # Create context with realistic browser properties
+        context = await browser.new_context(
+            viewport={'width': 1920, 'height': 1080},  # Realistic viewport
+            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',  # Updated, realistic UA
+            locale='en-US',
+            timezone_id='America/New_York',
+            permissions=['geolocation'],
+            geolocation={'latitude': 40.7128, 'longitude': -74.0060},  # NYC coordinates
+            color_scheme='light',
+            extra_http_headers={
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept-Encoding': 'gzip, deflate, br',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+            }
+        )
+        
+        page = await context.new_page()
+        
+        # Remove webdriver traces and add stealth JavaScript
+        await page.add_init_script("""
+            // Remove webdriver property
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+            
+            // Override plugins to look more realistic
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+            
+            // Override languages
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['en-US', 'en']
+            });
+            
+            // Mock chrome object
+            window.chrome = {
+                runtime: {}
+            };
+            
+            // Override permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+        """)
         
 
         return_data = []
 
-        await navigate_to_page(page, BASE_URL)
-
-        content = await page.content()
-        if content:
-            print(f"Content found!")
-        else:
-            print("No content found")
-           
-
+        # Navigate with better wait strategy
+        print(f"Navigating to {BASE_URL}...")
+        await page.goto(BASE_URL, wait_until='networkidle', timeout=PAGE_LOAD_TIMEOUT)
+        await page.wait_for_timeout(WAIT_TIME_MEDIUM)  # Extra wait for JS to render
+        
+        # Wait for page to be fully loaded
+        try:
+            await page.wait_for_load_state('domcontentloaded', timeout=10000)
+            await page.wait_for_load_state('networkidle', timeout=15000)
+        except Exception as e:
+            print(f"Warning: Load state wait timed out: {e}")
 
         # Debug: Check what's actually on the page
         real_url = page.url
@@ -166,8 +230,10 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             print('Age gate encountered!')
             await handle_age_gate(page)
             # After handling age gate, we need to navigate to the actual page
-
-            await navigate_to_page(page, BASE_URL)
+            print(f"Navigating to {BASE_URL} after age gate...")
+            await page.goto(BASE_URL, wait_until='networkidle', timeout=PAGE_LOAD_TIMEOUT)
+            await page.wait_for_timeout(WAIT_TIME_MEDIUM)
+            await page.wait_for_load_state('networkidle', timeout=15000)
             real_url = page.url
             print(f"After age gate handling, URL: {real_url}")
         else:
@@ -177,7 +243,10 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             print('Cookie consent encountered!')
             await handle_cookie_consent(page)
             # After handling cookie consent, we need to navigate to the actual page
-            await navigate_to_page(page, BASE_URL)
+            print(f"Navigating to {BASE_URL} after cookie consent...")
+            await page.goto(BASE_URL, wait_until='networkidle', timeout=PAGE_LOAD_TIMEOUT)
+            await page.wait_for_timeout(WAIT_TIME_MEDIUM)
+            await page.wait_for_load_state('networkidle', timeout=15000)
             real_url = page.url
             print(f"After cookie consent handling, URL: {real_url}")
         else:
@@ -199,14 +268,28 @@ async def find_all_themes() -> List[Dict[str, Any]]:
                 print(f"Warning: Could not find theme links with alternative selector: {e2}")
 
         # Wait a bit more for JavaScript to fully render
-        await page.wait_for_timeout(WAIT_TIME_MEDIUM)
+        await page.wait_for_timeout(WAIT_TIME_MEDIUM * 2)  # Extra wait for JS-heavy pages
+        
+        # Scroll page to trigger lazy loading if any
+        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
+        await page.wait_for_timeout(WAIT_TIME_SHORT)
+        await page.evaluate("window.scrollTo(0, 0)")
+        await page.wait_for_timeout(WAIT_TIME_SHORT)
 
         # Get fresh content after all navigation and waiting
         content = await page.content()
         if content:
             print(f"Content found! Content length: {len(content)}")
+            # Check if we got a minimal/error page
+            if len(content) < 10000:
+                print(f"⚠️  Warning: Content length is suspiciously short ({len(content)} chars)")
+                print(f"   This might indicate bot detection or an error page")
+                # Check for common error indicators
+                if 'blocked' in content.lower() or 'access denied' in content.lower() or 'captcha' in content.lower():
+                    print("   ⚠️  Page appears to be blocked or showing CAPTCHA")
         else:
             print("No content found")
+            await context.close()
             await browser.close()
             return return_data
 
@@ -267,7 +350,15 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             print(f"HTML saved to {html_path} for inspection")
             print(f"Page URL was: {real_url}")
             print(f"Content length: {len(content)} characters")
+            # Also save a screenshot for debugging
+            try:
+                screenshot_path = "html_files/themes_page_screenshot.png"
+                await page.screenshot(path=screenshot_path, full_page=True)
+                print(f"Screenshot saved to {screenshot_path}")
+            except Exception as e:
+                print(f"Could not save screenshot: {e}")
                     
+        await context.close()
         await browser.close()
         print('Browser closed!')
 
