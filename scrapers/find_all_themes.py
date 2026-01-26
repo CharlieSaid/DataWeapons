@@ -175,16 +175,33 @@ async def find_all_themes() -> List[Dict[str, Any]]:
         
         page = await context.new_page()
         
-        # Remove webdriver traces and add stealth JavaScript
+        # Enhanced stealth JavaScript to bypass Cloudflare
         await page.add_init_script("""
-            // Remove webdriver property
+            // Remove webdriver property completely
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
             });
             
-            // Override plugins to look more realistic
+            // Override plugins to look realistic
             Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
+                get: () => {
+                    const plugins = [];
+                    plugins.push({
+                        0: {type: "application/x-google-chrome-pdf", suffixes: "pdf", description: "Portable Document Format"},
+                        description: "Portable Document Format",
+                        filename: "internal-pdf-viewer",
+                        length: 1,
+                        name: "Chrome PDF Plugin"
+                    });
+                    plugins.push({
+                        0: {type: "application/pdf", suffixes: "pdf", description: ""},
+                        description: "",
+                        filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+                        length: 1,
+                        name: "Chrome PDF Viewer"
+                    });
+                    return plugins;
+                }
             });
             
             // Override languages
@@ -192,9 +209,12 @@ async def find_all_themes() -> List[Dict[str, Any]]:
                 get: () => ['en-US', 'en']
             });
             
-            // Mock chrome object
+            // Mock chrome object with realistic properties
             window.chrome = {
-                runtime: {}
+                runtime: {},
+                loadTimes: function() {},
+                csi: function() {},
+                app: {}
             };
             
             // Override permissions
@@ -204,20 +224,96 @@ async def find_all_themes() -> List[Dict[str, Any]]:
                     Promise.resolve({ state: Notification.permission }) :
                     originalQuery(parameters)
             );
+            
+            // Override getBattery if it exists
+            if (navigator.getBattery) {
+                navigator.getBattery = () => Promise.resolve({
+                    charging: true,
+                    chargingTime: 0,
+                    dischargingTime: Infinity,
+                    level: 1
+                });
+            }
+            
+            // Add realistic screen properties
+            Object.defineProperty(screen, 'availWidth', {get: () => 1920});
+            Object.defineProperty(screen, 'availHeight', {get: () => 1040});
+            Object.defineProperty(screen, 'width', {get: () => 1920});
+            Object.defineProperty(screen, 'height', {get: () => 1080});
+            
+            // Override toString methods to hide automation
+            const originalToString = Function.prototype.toString;
+            Function.prototype.toString = function() {
+                if (this === navigator.webdriver || this === window.chrome) {
+                    return 'function () { [native code] }';
+                }
+                return originalToString.apply(this, arguments);
+            };
+            
+            // Hide automation indicators
+            Object.defineProperty(navigator, 'hardwareConcurrency', {get: () => 8});
+            Object.defineProperty(navigator, 'deviceMemory', {get: () => 8});
+            
+            // Override canvas fingerprinting
+            const getContext = HTMLCanvasElement.prototype.getContext;
+            HTMLCanvasElement.prototype.getContext = function(type) {
+                if (type === '2d') {
+                    const context = getContext.apply(this, arguments);
+                    const originalFillText = context.fillText;
+                    context.fillText = function() {
+                        return originalFillText.apply(this, arguments);
+                    };
+                    return context;
+                }
+                return getContext.apply(this, arguments);
+            };
         """)
         
 
         return_data = []
 
-        # Navigate with better wait strategy
-        print(f"Navigating to {BASE_URL}...")
-        await page.goto(BASE_URL, wait_until='networkidle', timeout=PAGE_LOAD_TIMEOUT)
-        await page.wait_for_timeout(WAIT_TIME_MEDIUM)  # Extra wait for JS to render
+        # Strategy: Visit homepage first to establish session and pass Cloudflare check
+        print("Step 1: Visiting homepage to establish session...")
+        try:
+            await page.goto("https://www.lego.com", wait_until='domcontentloaded', timeout=PAGE_LOAD_TIMEOUT)
+            await page.wait_for_timeout(WAIT_TIME_MEDIUM * 2)  # Wait for Cloudflare check if any
+            
+            # Check if we hit Cloudflare challenge
+            content = await page.content()
+            if 'cloudflare' in content.lower() or 'challenge' in content.lower() or 'just a moment' in content.lower():
+                print("⚠️  Cloudflare challenge detected, waiting for it to complete...")
+                # Wait for Cloudflare challenge to complete (can take 5-10 seconds)
+                try:
+                    await page.wait_for_load_state('networkidle', timeout=30000)
+                    await page.wait_for_timeout(5000)  # Extra wait after challenge
+                    print("✅ Cloudflare challenge completed")
+                except Exception as e:
+                    print(f"Warning: Challenge wait timed out: {e}")
+            
+            # Wait for page to fully load
+            await page.wait_for_load_state('networkidle', timeout=15000)
+            await page.wait_for_timeout(WAIT_TIME_MEDIUM)
+            
+            print("✅ Homepage loaded, session established")
+        except Exception as e:
+            print(f"Warning: Homepage visit failed: {e}, continuing anyway...")
+
+        # Now navigate to themes page with established session
+        print(f"Step 2: Navigating to {BASE_URL}...")
+        await page.goto(BASE_URL, wait_until='domcontentloaded', timeout=PAGE_LOAD_TIMEOUT)
+        await page.wait_for_timeout(WAIT_TIME_MEDIUM * 2)  # Extra wait for JS to render
+        
+        # Check again for Cloudflare
+        content_check = await page.content()
+        if 'cloudflare' in content_check.lower() or 'sorry, you have been blocked' in content_check.lower():
+            print("⚠️  Still blocked by Cloudflare, waiting longer...")
+            await page.wait_for_timeout(10000)  # Wait 10 seconds
+            await page.wait_for_load_state('networkidle', timeout=30000)
         
         # Wait for page to be fully loaded
         try:
             await page.wait_for_load_state('domcontentloaded', timeout=10000)
-            await page.wait_for_load_state('networkidle', timeout=15000)
+            await page.wait_for_load_state('networkidle', timeout=20000)
         except Exception as e:
             print(f"Warning: Load state wait timed out: {e}")
 
@@ -280,6 +376,26 @@ async def find_all_themes() -> List[Dict[str, Any]]:
         content = await page.content()
         if content:
             print(f"Content found! Content length: {len(content)}")
+            
+            # Check for Cloudflare block page
+            if 'cloudflare' in content.lower() and ('blocked' in content.lower() or 'sorry' in content.lower()):
+                print("❌ Cloudflare block page detected!")
+                print("   The site is actively blocking automated access.")
+                print("   Possible solutions:")
+                print("   1. Use a residential proxy service")
+                print("   2. Use a service like ScrapingBee or Bright Data")
+                print("   3. Run the scraper from a different IP/location")
+                print("   4. Contact LEGO.com to request API access")
+                # Still save the HTML for inspection
+                os.makedirs("html_files", exist_ok=True)
+                html_path = "html_files/cloudflare_block.html"
+                with open(html_path, "w", encoding='utf-8') as f:
+                    f.write(content)
+                print(f"   Block page HTML saved to {html_path}")
+                await context.close()
+                await browser.close()
+                return return_data  # Return empty, let the caller handle it
+            
             # Check if we got a minimal/error page
             if len(content) < 10000:
                 print(f"⚠️  Warning: Content length is suspiciously short ({len(content)} chars)")
