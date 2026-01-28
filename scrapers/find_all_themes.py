@@ -137,41 +137,67 @@ async def find_all_themes() -> List[Dict[str, Any]]:
     
     async with async_playwright() as p:
         # Launch browser with stealth settings
-        browser = await p.chromium.launch(
+        browser = await p.webkit.launch(
             headless=True,
             args=[
-                '--disable-blink-features=AutomationControlled',  # Remove automation flags
-                '--disable-dev-shm-usage',
-                '--no-sandbox',
-                '--disable-setuid-sandbox',
-                '--disable-web-security',
-                '--disable-features=IsolateOrigins,site-per-process',
+                "--disable-gpu",
+                "--disable-software-rasterizer",
+                "--disable-dev-shm-usage",
+                "--disable-renderer-backgrounding",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-features=IsolateOrigins,site-per-process",
+                "--no-sandbox",
             ]
+            
+            # headless=True,
+            # args=[
+            #     '--disable-blink-features=AutomationControlled', 
+            #     '--disable-dev-shm-usage',
+            #     '--no-sandbox',
+            #     '--disable-setuid-sandbox',
+            #     '--disable-web-security',
+            #     '--disable-features=IsolateOrigins,site-per-process',
+            # ]
         )
         
-        # Create context with realistic browser properties
-        context = await browser.new_context(
-            viewport={'width': 1920, 'height': 1080},  # Realistic viewport
-            user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',  # Updated, realistic UA
-            locale='en-US',
-            timezone_id='America/New_York',
-            permissions=['geolocation'],
-            geolocation={'latitude': 40.7128, 'longitude': -74.0060},  # NYC coordinates
-            color_scheme='light',
-            extra_http_headers={
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0',
-            }
+        REALISTIC_UA = (
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+            "AppleWebKit/605.1.15 (KHTML, like Gecko) "
+            "Version/17.5 Safari/605.1.15"
         )
+
+        context = await browser.new_context(
+            viewport={"width": 1366, "height": 768},  # smaller viewport
+            device_scale_factor=1,
+            user_agent=REALISTIC_UA,
+        )
+
+
+
+        # # Create context with realistic browser properties
+        # context = await browser.new_context(
+        #     viewport={'width': 1920, 'height': 1080},  # Realistic viewport
+        #     user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',  # Updated, realistic UA
+        #     locale='en-US',
+        #     timezone_id='America/New_York',
+        #     permissions=['geolocation'],
+        #     geolocation={'latitude': 40.7128, 'longitude': -74.0060},  # NYC coordinates
+        #     color_scheme='light',
+        #     extra_http_headers={
+        #         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        #         'Accept-Language': 'en-US,en;q=0.9',
+        #         'Accept-Encoding': 'gzip, deflate, br',
+        #         'DNT': '1',
+        #         'Connection': 'keep-alive',
+        #         'Upgrade-Insecure-Requests': '1',
+        #         'Sec-Fetch-Dest': 'document',
+        #         'Sec-Fetch-Mode': 'navigate',
+        #         'Sec-Fetch-Site': 'none',
+        #         'Sec-Fetch-User': '?1',
+        #         'Cache-Control': 'max-age=0',
+        #     }
+        # )
         
         page = await context.new_page()
         
