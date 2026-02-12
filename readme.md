@@ -16,10 +16,8 @@ I am a Lego enthusiast who has built a respectable collection over the years.  M
 
 # Design notes
 
-1.) A lot of the files for this project are not public.  The scraper, underlying data files, etc., are proprietary.
+1.) The scraper scripts run on scheduled GitHub Action cron jobs to keep the data current.
 
-2.) The scraper scripts run on scheduled GitHub Action cron jobs to keep the data current.
+2.) The website shows a lot of the data for free.  This is to build goodwill with users and to establish myself in the Lego space.  This is not going to change long-term.  I want the premium users to feel rewarded, so most new features will probably be built for premium users, but low-cost, low-effort data will be available to anyone using the site.
 
-3.) The website shows a lot of the data for free.  This is to build goodwill with users and to establish myself in the Lego space.  This is not going to change long-term.  I want the premium users to feel rewarded, so most new features will probably be built for premium users, but low-cost, low-effort data will be available to anyone using the site.
-
-4.) I need to build an email list to send out updated free-tier data each week or month.  Users should be able to select their desired frequency of email when they sign up.  Joining the email list should be optional; unsubscribing should be easy.
+3.) I need to build an email list to send out updated free-tier data each week or month.  Users should be able to select their desired frequency of email when they sign up.  Joining the email list should be optional; unsubscribing should be easy.

@@ -14,8 +14,8 @@ body {
 
 /* Header */
 header {
-    background-color: #f8f9fa;
-    border-bottom: 1px solid #e9ecef;
+    background-color: #002366; /* Royal blue */
+    border-bottom: 1px solid #001a4d;
     padding: 1rem 0;
 }
 
@@ -24,20 +24,37 @@ nav {
     margin: 0 auto;
     padding: 0 1rem;
     display: flex;
+    align-items: center;
     gap: 2rem;
+}
+
+.nav-left {
+    display: flex;
+    gap: 2rem;
+}
+
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 2rem;
+    margin-left: auto;
 }
 
 nav a {
     text-decoration: none;
-    color: #666;
+    color: #e6f0ff; /* Light blue/white for contrast on royal blue */
     font-weight: 500;
     padding: 0.5rem 0;
     transition: color 0.2s ease;
 }
 
-nav a:hover,
+nav a:hover {
+    color: #ffffff; /* Pure white on hover */
+}
+
 nav a.active {
-    color: #007bff;
+    color: #ffffff; /* Pure white for active link */
+    font-weight: 600;
 }
 
 /* Main content */
@@ -96,6 +113,113 @@ tr:hover {
     background-color: #f8f9fa;
 }
 
+/* Set name links */
+.set-name-link {
+    color: #007bff;
+    text-decoration: none;
+    font-weight: 500;
+    transition: color 0.2s ease, text-decoration 0.2s ease;
+}
+
+.set-name-link:hover {
+    color: #0056b3;
+    text-decoration: underline;
+}
+
+.set-name-link:visited {
+    color: #6c5ce7;
+}
+
+/* Search bar */
+.search-container {
+    margin-bottom: 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.search-input {
+    flex: 1;
+    min-width: 250px;
+    max-width: 500px;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+}
+
+.search-input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.search-input::placeholder {
+    color: #adb5bd;
+}
+
+.hide-na-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 1rem;
+    cursor: pointer;
+    user-select: none;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.hide-na-toggle input[type="checkbox"] {
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: #007bff;
+}
+
+.hide-na-toggle:hover {
+    color: #333;
+}
+
+.pov-period-selector {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-left: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.pov-period-select {
+    padding: 0.5rem 0.75rem;
+    font-size: 0.9rem;
+    border: 2px solid #e9ecef;
+    border-radius: 6px;
+    background-color: #fff;
+    color: #333;
+    cursor: pointer;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    font-family: inherit;
+}
+
+.pov-period-select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+}
+
+.pov-period-select:hover {
+    border-color: #007bff;
+}
+
+.search-results-count {
+    color: #6c757d;
+    font-size: 0.9rem;
+    white-space: nowrap;
+}
+
 /* Loading state */
 #data-container {
     min-height: 200px;
@@ -107,7 +231,6 @@ tr:hover {
 /* Account menu */
 .account-menu {
     position: relative;
-    margin-left: auto;
 }
 .account-icon {
     width: 40px;
@@ -171,7 +294,15 @@ tr:hover {
 @media (max-width: 768px) {
     nav {
         flex-direction: column;
+        align-items: flex-start;
         gap: 0.5rem;
+    }
+    
+    .nav-left,
+    .nav-right {
+        margin-left: 0;
+        flex-direction: column;
+        align-items: flex-start;
     }
     
     main {

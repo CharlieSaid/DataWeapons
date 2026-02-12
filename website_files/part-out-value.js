@@ -6,8 +6,6 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 let supabaseClient = null;
 
 function initSupabase() {
-    // Check if Supabase SDK is available (loaded via script tag in HTML)
-    // The SDK can be available as window.supabase or just supabase
     const supabaseLib = window.supabase || (typeof supabase !== 'undefined' ? supabase : null);
     
     if (supabaseLib && typeof supabaseLib.createClient === 'function') {
@@ -18,21 +16,21 @@ function initSupabase() {
 }
 
 // Numeric column patterns - columns matching these patterns should be sorted numerically
-// This includes base names and names with suffixes
+// This includes base names and names with suffixes like _current, _past_6m
 const NUMERIC_COLUMN_PATTERNS = [
-    'price_per_piece',
-    'sale_price',
-    'msrp',
-    'piece_count',
-    'item_number',
     'profit_pct',
     'profit_margin_pct',
+    'msrp',
+    'sale_price',
     'pov_vs_sale_profit',
     'pov_vs_msrp_profit',
     'pov_current_listings',
     'pov_past_6_months',
     'pov_per_piece',
-    'value_ratio'
+    'value_ratio',
+    'item_number',
+    'piece_count',
+    'price_per_piece'
 ];
 
 // Sort data by column
@@ -92,31 +90,50 @@ function sortData(data, column, direction) {
 
 // Format currency values
 function formatCurrency(value) {
-    if (!value || value === '' || value === null || value === undefined) return 'N/A';
-    // If it's a number, format it as currency
-    if (typeof value === 'number') {
-        return `$${value.toFixed(2)}`;
-    }
-    // If it's a string, check if it already has $ or format it
-    if (typeof value === 'string') {
-        const numValue = parseFloat(value);
-        if (!isNaN(numValue)) {
-            return `$${numValue.toFixed(2)}`;
-        }
-    }
+    if (!value || value === '') return 'N/A';
     return value;
 }
 
-// Define columns to display in order
-const DISPLAY_COLUMNS = ['set_name', 'price_per_piece', 'sale_price', 'msrp'];
+// Base column definitions (without time period suffix)
+const BASE_DISPLAY_COLUMNS = [
+    'set_name',
+    'profit_pct',
+    'msrp',
+    'sale_price',
+    'pov_vs_sale_profit',
+    'pov_absolute',
+    'pov_per_piece'
+];
 
-// Map column names to display names
-const COLUMN_DISPLAY_NAMES = {
+// Column display names mapping (base names, will be resolved to actual column names)
+const BASE_COLUMN_DISPLAY_NAMES = {
     'set_name': 'Set Name',
-    'price_per_piece': 'Price-Per-Piece',
+    'profit_pct': 'Profit %',
+    'msrp': 'MSRP',
     'sale_price': 'Sale Price',
-    'msrp': 'MSRP'
+    'pov_vs_sale_profit': 'POV minus Cost',
+    'pov_absolute': 'POV (Absolute)',
+    'pov_per_piece': 'POV per Piece'
 };
+
+// Get the actual column names based on the selected POV period
+function getDisplayColumns() {
+    const suffix = povPeriod === 'current' ? '_current' : '_past_6m';
+    return BASE_DISPLAY_COLUMNS.map(col => {
+        if (col === 'set_name' || col === 'msrp' || col === 'sale_price') {
+            return col; // These don't have time period variants
+        } else if (col === 'pov_absolute') {
+            return povPeriod === 'current' ? 'pov_current_listings' : 'pov_past_6_months';
+        } else {
+            return col + suffix;
+        }
+    });
+}
+
+// Get column display names (same for both periods)
+function getColumnDisplayNames() {
+    return BASE_COLUMN_DISPLAY_NAMES;
+}
 
 // Create table HTML with sorting
 function createTable(data, sortColumn = null, sortDirection = 'asc') {
@@ -124,13 +141,23 @@ function createTable(data, sortColumn = null, sortDirection = 'asc') {
         return '<p>No data available</p>';
     }
     
-    // Use only the specified columns in the specified order
-    const headers = DISPLAY_COLUMNS.filter(col => data[0].hasOwnProperty(col));
+    // Get the actual column names based on current POV period
+    const displayColumns = getDisplayColumns();
+    const columnDisplayNames = getColumnDisplayNames();
+    
+    // Map base column names to actual column names for display name lookup
+    const baseToActual = {};
+    BASE_DISPLAY_COLUMNS.forEach((baseCol, idx) => {
+        baseToActual[displayColumns[idx]] = baseCol;
+    });
+    
+    // Filter to only show specified columns
+    const headers = displayColumns.filter(col => data[0].hasOwnProperty(col));
     let html = '<table><thead><tr>';
     
-    // Create header row with clickable sortable headers
     headers.forEach(header => {
-        const displayName = COLUMN_DISPLAY_NAMES[header] || header.replace('_', ' ').toUpperCase();
+        const baseCol = baseToActual[header] || header;
+        const displayName = columnDisplayNames[baseCol] || header.replace(/_/g, ' ').toUpperCase();
         let sortIndicator = '';
         
         if (sortColumn === header) {
@@ -154,13 +181,33 @@ function createTable(data, sortColumn = null, sortDirection = 'asc') {
                 } else {
                     value = value || 'N/A';
                 }
-            } else if (header === 'price_per_piece' && value !== null && value !== undefined) {
-                // Format price_per_piece as currency with 4 decimal places
-                value = `$${parseFloat(value).toFixed(4)}`;
-            } else if (header.includes('price') || header === 'sale_price' || header === 'msrp') {
-                value = formatCurrency(value);
+            } else if (header.includes('profit_pct')) {
+                // Format profit percentage with % sign
+                if (value == null || value === '') {
+                    value = 'N/A';
+                } else {
+                    const numValue = typeof value === 'number' ? value : parseFloat(value);
+                    value = isNaN(numValue) ? 'N/A' : `${numValue.toFixed(2)}%`;
+                }
+            } else if (header.includes('per_piece')) {
+                // Format per piece with 4 decimal places
+                if (value == null || value === '') {
+                    value = 'N/A';
+                } else {
+                    const numValue = typeof value === 'number' ? value : parseFloat(value);
+                    value = isNaN(numValue) ? 'N/A' : `$${numValue.toFixed(4)}`;
+                }
+            } else if (header === 'msrp' || header.includes('price') || header.includes('pov') || header.includes('profit')) {
+                // Format as currency
+                if (value == null || value === '') {
+                    value = 'N/A';
+                } else if (typeof value === 'number') {
+                    value = `$${value.toFixed(2)}`;
+                } else {
+                    value = formatCurrency(value);
+                }
             }
-            html += `<td>${value}</td>`;
+            html += `<td>${value ?? ''}</td>`;
         });
         html += '</tr>';
     });
@@ -171,10 +218,11 @@ function createTable(data, sortColumn = null, sortDirection = 'asc') {
 
 // Global state for sorting and filtering
 let currentData = [];
-let currentSortColumn = 'price_per_piece'; // Default sort column
-let currentSortDirection = 'asc'; // Default sort direction
+let currentSortColumn = 'pov_vs_sale_profit_current';
+let currentSortDirection = 'desc';
 let currentSearchTerm = ''; // Current search filter
 let hideNAData = true; // Default to hiding NA data
+let povPeriod = 'current'; // 'current' or 'past_6m' - which POV period to use for derived fields
 
 // Filter data by set name (case-insensitive substring match)
 function filterDataBySearch(data, searchTerm) {
@@ -189,18 +237,28 @@ function filterDataBySearch(data, searchTerm) {
     });
 }
 
-// Filter out rows with NA values in key numeric columns
+// Filter out rows with NA values in POV-related columns
 function filterNAData(data, hideNA) {
     if (!hideNA) {
         return data;
     }
     
-    // Key columns that should not be NA for meaningful display
-    const keyColumns = ['price_per_piece', 'sale_price', 'msrp'];
+    // Get the actual column names based on current POV period
+    const suffix = povPeriod === 'current' ? '_current' : '_past_6m';
+    const povAbsoluteCol = povPeriod === 'current' ? 'pov_current_listings' : 'pov_past_6_months';
+    
+    // POV-related columns that should not be NA (using current period's columns)
+    const povColumns = [
+        'profit_pct' + suffix,
+        'pov_vs_sale_profit' + suffix,
+        povAbsoluteCol,
+        'pov_per_piece' + suffix,
+        'pov_vs_msrp_profit' + suffix
+    ];
     
     return data.filter(row => {
-        // Check if at least one key column has a valid (non-NA) value
-        return keyColumns.some(col => {
+        // Check if at least one POV column has a valid (non-NA) value
+        return povColumns.some(col => {
             const value = row[col];
             // Consider value valid if it's not null, undefined, empty string, or 'N/A'
             return value !== null && 
@@ -230,11 +288,14 @@ function initializeSearchBar() {
     // Get or create search input
     let searchInput = document.getElementById('search-input');
     let hideNAToggle = document.getElementById('hide-na-toggle');
+    let povPeriodSelect = document.getElementById('pov-period-select');
     
     if (!searchInput) {
         // Create search bar HTML if input doesn't exist
         const escapedSearchTerm = (currentSearchTerm || '').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         const checkedAttr = hideNAData ? ' checked' : '';
+        const selectedCurrent = povPeriod === 'current' ? ' selected' : '';
+        const selectedPast6m = povPeriod === 'past_6m' ? ' selected' : '';
         searchBarContainer.innerHTML = '<div class="search-container">' +
             '<input type="text" id="search-input" class="search-input" placeholder="Search by set name..." value="' + escapedSearchTerm + '">' +
             '<span class="search-results-count" id="search-results-count">0 sets</span>' +
@@ -242,9 +303,17 @@ function initializeSearchBar() {
             '<input type="checkbox" id="hide-na-toggle"' + checkedAttr + '>' +
             '<span>Hide NA data</span>' +
             '</label>' +
+            '<label class="pov-period-selector">' +
+            '<span>POV Period:</span>' +
+            '<select id="pov-period-select" class="pov-period-select">' +
+            '<option value="current"' + selectedCurrent + '>Current Listings</option>' +
+            '<option value="past_6m"' + selectedPast6m + '>Past 6 Months</option>' +
+            '</select>' +
+            '</label>' +
             '</div>';
         searchInput = document.getElementById('search-input');
         hideNAToggle = document.getElementById('hide-na-toggle');
+        povPeriodSelect = document.getElementById('pov-period-select');
     }
     
     // Always ensure event listener is attached (in case input exists from HTML)
@@ -265,6 +334,25 @@ function initializeSearchBar() {
         });
     }
     
+    // Attach event listener to POV period selector
+    if (povPeriodSelect && !povPeriodSelect.hasAttribute('data-listener-attached')) {
+        povPeriodSelect.setAttribute('data-listener-attached', 'true');
+        povPeriodSelect.addEventListener('change', (e) => {
+            povPeriod = e.target.value;
+            // Update sort column if it's a derived field
+            const suffix = povPeriod === 'current' ? '_current' : '_past_6m';
+            if (currentSortColumn.endsWith('_current') || currentSortColumn.endsWith('_past_6m')) {
+                const baseCol = currentSortColumn.replace(/_current$|_past_6m$/, '');
+                currentSortColumn = baseCol + suffix;
+            } else if (currentSortColumn === 'pov_current_listings') {
+                currentSortColumn = povPeriod === 'current' ? 'pov_current_listings' : 'pov_past_6_months';
+            } else if (currentSortColumn === 'pov_past_6_months') {
+                currentSortColumn = povPeriod === 'current' ? 'pov_current_listings' : 'pov_past_6_months';
+            }
+            renderTable();
+        });
+    }
+    
     // Sync input value with current search term
     if (searchInput && searchInput.value !== currentSearchTerm) {
         searchInput.value = currentSearchTerm;
@@ -273,6 +361,11 @@ function initializeSearchBar() {
     // Sync toggle state
     if (hideNAToggle && hideNAToggle.checked !== hideNAData) {
         hideNAToggle.checked = hideNAData;
+    }
+    
+    // Sync period selector state
+    if (povPeriodSelect && povPeriodSelect.value !== povPeriod) {
+        povPeriodSelect.value = povPeriod;
     }
     
     searchBarContainer.style.display = 'block';
@@ -303,17 +396,14 @@ function renderTable() {
     const tableHtml = createTable(sortedData, currentSortColumn, currentSortDirection);
     container.innerHTML = tableHtml;
     
-    // Add click handlers to sortable headers
     const sortableHeaders = container.querySelectorAll('th.sortable');
     sortableHeaders.forEach(header => {
         header.addEventListener('click', () => {
             const column = header.getAttribute('data-column');
             
             if (currentSortColumn === column) {
-                // Toggle direction if same column
                 currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
             } else {
-                // New column, start with ascending
                 currentSortColumn = column;
                 currentSortDirection = 'asc';
             }
@@ -328,17 +418,17 @@ async function loadData() {
     const container = document.getElementById('data-container');
     
     try {
-        // Initialize Supabase if not already done
         if (!supabaseClient) {
             if (!initSupabase()) {
                 throw new Error('Supabase SDK not loaded. Please check script tag in HTML.');
             }
         }
 
-        const tableName = 'lego_sets_overview';
+        const tableName = 'lego_sets_with_pov';
         console.log(`Querying Supabase table: ${tableName}`);
         
         // Load ALL rows by using pagination (Supabase default limit is 1000)
+        // Fetch in batches to get all data
         let allData = [];
         let hasMore = true;
         let offset = 0;
@@ -347,8 +437,7 @@ async function loadData() {
         while (hasMore) {
             const { data, error } = await supabaseClient
                 .from(tableName) 
-                .select('*')
-                .order('price_per_piece', { ascending: true })
+                .select('set_name, url, profit_pct_current, profit_pct_past_6m, msrp, sale_price, pov_vs_sale_profit_current, pov_vs_sale_profit_past_6m, pov_current_listings, pov_past_6_months, pov_per_piece_current, pov_per_piece_past_6m')
                 .range(offset, offset + batchSize - 1); // Fetch batch
             
             if (error) {
@@ -367,7 +456,6 @@ async function loadData() {
         
         const data = allData;
     
-        // Log the full response for debugging
         console.log('Supabase response:', { data, dataLength: data?.length });
         
         if (!data) {
@@ -389,17 +477,14 @@ async function loadData() {
         console.error('Error loading data:', error);
         container.innerHTML = `<p>Error loading data: ${error.message}</p>`;
     }
-
 }
 
-// Load data when the page loads (wait for Supabase SDK to be ready)
+// Load data when the page loads
 document.addEventListener('DOMContentLoaded', () => {
-    // Wait for Supabase to be ready
     function waitForSupabase() {
         if (window.supabaseReady || typeof window.supabase !== 'undefined') {
             loadData();
         } else {
-            // Retry after a short delay (max 2 seconds)
             const startTime = Date.now();
             const checkInterval = setInterval(() => {
                 if (window.supabaseReady || typeof window.supabase !== 'undefined') {
@@ -416,4 +501,3 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     waitForSupabase();
 });
-

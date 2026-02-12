@@ -10,6 +10,7 @@ import re
 try:
     from supabase_client import get_supabase_client, upsert_lego_sets
 except ImportError:
+    print("Error importing supabase_client")
     # Fallback if supabase_client is not available
     def get_supabase_client():
         return None
@@ -130,6 +131,100 @@ async def navigate_to_page(page, url: str, timeout: int = PAGE_LOAD_TIMEOUT) -> 
     await page.wait_for_timeout(WAIT_TIME_MEDIUM)
 
 
+def parse_price(price_element) -> tuple:
+    """
+    Parse price from price element.
+    
+    Returns:
+        tuple: (msrp, sale_price) as strings
+    """
+    price_text = price_element.get_text(strip=True)
+    
+    # Check if price_element contains a discount percentage (a sale price)
+    if "%" in price_text:
+        pattern = r'(\$\d+\.\d{2})(\$\d+\.\d{2})(\d+% OFF)'
+        match = re.match(pattern, price_text)
+        if match:
+            return match.group(1), match.group(2)
+        else:
+            print(f"Could not parse base price: {price_text}")
+            return None, None
+    
+    # Check for Insiders pricing
+    elif "Insiders" in price_text:
+        print(f"Insiders price element: {price_text}")
+        pattern = r'(\$\d+\.\d{2})(\$\d+\.\d{2})'
+        match = re.match(pattern, price_text)
+        if match:
+            return match.group(1), match.group(2)
+        else:
+            print(f"Could not parse base price: {price_text}")
+            return None, None
+    
+    # Regular price (no discount)
+    else:
+        return price_text, price_text
+
+
+def extract_product_data(set_item) -> Optional[Dict[str, Any]]:
+    """
+    Extract product data from a set item element.
+    
+    Returns:
+        Dictionary with product data, or None if extraction fails
+    """
+    try:
+        # Find the link
+        link_element = set_item.find('a')
+        if not link_element:
+            return None
+            
+        url_extension = link_element.get('href', '')
+        
+        # Ensure that the set is a product (not an ad)
+        if 'product' not in url_extension or '?icmp=' in url_extension:
+            return None
+            
+        url = f"https://www.lego.com{url_extension}"
+        item_number = url.split(sep='-')[-1]
+        
+        # Find product name
+        name_element = set_item.find('h3')
+        set_name = name_element.get_text(strip=True) if name_element else "Unknown"
+
+        availability_element = set_item.find("div", attrs={"data-test": "product-leaf-action-row"})
+        availability = availability_element.get_text(strip=True) if availability_element else "Unknown"
+        
+        # Find price
+        price_element = set_item.find('div', class_="ProductLeaf_priceRow__kwpxi")
+        if price_element is None:
+            return None
+
+        msrp, sale_price = parse_price(price_element)
+        if msrp is None:
+            return None
+
+        # Find piece count
+        piece_count_element = set_item.find('span', attrs={"data-test": "product-leaf-piece-count-label"})
+        piece_count = piece_count_element.get_text(strip=True) if piece_count_element else "Piece count not found"
+
+        if 'Key Chain' in set_name:
+            piece_count = 1
+        
+        return {
+            "set_name": set_name,
+            "msrp": msrp,
+            "sale_price": sale_price,
+            "availability": availability,
+            "piece_count": piece_count,
+            "url": url,
+            "item_number": item_number
+        }
+    except Exception as e:
+        print(f"  Error extracting product data: {e}")
+        return None
+
+
 async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     if themes is None:
         themes = pd.read_csv("themes_list.csv")["theme_name"].tolist()
@@ -230,17 +325,6 @@ async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]
 
                     
                     sets = soup.find_all("li", class_="Grid_grid-item__Dguxr", attrs={"data-test": "product-item"})
-                    
-                    # # If no sets found, try alternative selectors
-                    # if len(sets) == 0:
-                    #     print("No sets found with primary selector, trying alternatives...")
-                    #     sets = soup.find_all("li", attrs={"data-test": "product-item"})
-                    #     print(f"Found {len(sets)} with data-test='product-item'")
-                        
-                    #     if len(sets) == 0:
-                    #         sets = soup.find_all("li", class_="Grid_grid-item__Dguxr")
-                    #         print(f"Found {len(sets)} with class 'Grid_grid-item__Dguxr'")
-                    
                     print(f"Found {len(sets)} product items on page {page_number}")
 
                     if len(sets) == 0:
@@ -255,104 +339,13 @@ async def scrape_lego(themes: Optional[List[str]] = None) -> List[Dict[str, Any]
                     
                     # Process each set
                     for set_item in sets:
-                        try:
-                            # Find the link
-                            link_element = set_item.find('a')
-                            if not link_element:
-                                continue
-                                
-                            url_extension = link_element.get('href', '')
-                            
-                            # Ensure that the set is a product (not an ad)
-                            if 'product' not in url_extension:
-                                print(f"Skipping non-product: {url_extension}")
-                                continue
-
-                            # This is also an ad check.
-                            if '?icmp=' in url_extension:
-                                print(f"Skipping ad: {url_extension}")
-                                continue
-                                
-                            url = f"https://www.lego.com{url_extension}"
-                            item_number = url.split(sep = '-')[-1]
-                            
-                            # Find product name
-                            name_element = set_item.find('h3')
-                            set_name = name_element.get_text(strip=True) if name_element else "Unknown"
-
-                            availability_element = set_item.find("div", attrs={"data-test": "product-leaf-action-row"})
-                            availability = availability_element.get_text(strip=True) if availability_element else "Unknown"
-                            
-                            # Find price
-                            price_element = set_item.find('div', class_="ProductLeaf_priceRow__kwpxi")
-
-                            if price_element is None:
-                                print(f"No price element found: {url_extension}")
-
-                                msrp = None
-                                sale_price = None
-                                continue
-
-                            # Check if price_element contains a discount percentage (a sale price)
-                            if "%" in price_element.get_text(strip=True):
-                                base_price = price_element.get_text(strip=True)
-
-                                pattern = r'(\$\d+\.\d{2})(\$\d+\.\d{2})(\d+% OFF)'
-                                match = re.match(pattern, base_price)
-                                
-                                if match:
-                                    msrp = match.group(1)
-                                    sale_price = match.group(2)
-                                    discount_percentage = match.group(3)
-                                else:
-                                    print(f"Could not parse base price: {base_price}")
-                                    msrp = None
-                                    sale_price = None
-                                    discount_percentage = None
-                            
-                            elif "Insiders" in price_element.get_text(strip=True):
-                                # Regex function to extract the msrp (the first number that ends in .99) and the sale price (the immediately following number that ends in .99)
-                                print(f"Insiders price element: {price_element.get_text(strip=True)}")
-                                pattern = r'(\$\d+\.\d{2})(\$\d+\.\d{2})'
-                                match = re.match(pattern, price_element.get_text(strip=True))
-                                if match:
-                                    msrp = match.group(1)
-                                    sale_price = match.group(2)
-                                else:
-                                    print(f"Could not parse base price: {price_element.get_text(strip=True)}")
-                                    msrp = None
-
-
-                            else:
-                                msrp = price_element.get_text(strip=True)
-                                sale_price = msrp
-
-                            # Find piece count
-                            piece_count_element = set_item.find('span', attrs={"data-test": "product-leaf-piece-count-label"})
-                            piece_count = piece_count_element.get_text(strip=True) if piece_count_element else "Piece count not found"
-
-                            if 'Key Chain' in set_name:
-                                piece_count = 1
-                            
-                            return_data.append({
-                                "set_name": set_name,
-                                "msrp": msrp,
-                                "sale_price": sale_price,
-                                "availability": availability,
-                                "piece_count": piece_count,
-                                "url": url,
-                                "item_number": item_number
-                            })
-
-
-                            print(f"  {set_name} - {msrp} - {sale_price} - {piece_count}")
+                        product_data = extract_product_data(set_item)
+                        if product_data:
+                            return_data.append(product_data)
+                            print(f"  {product_data['set_name']} - {product_data['msrp']} - "
+                                  f"{product_data['sale_price']} - {product_data['piece_count']}")
                             total_sets += 1
-
                             sets_scraped_from_theme += 1
-                            
-                        except Exception as e:
-                            print(f"  Error processing product: {e}")
-                            continue
                     
 
 

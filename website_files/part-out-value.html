@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>DataWeapons</title>
+    <title>Part-Out-Value - Lego Store Overview</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Pinned to specific version for security (check for updates regularly) -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3"></script>
@@ -22,29 +22,18 @@
     <header>
         <nav>
             <div class="nav-left">
-                <a href="index.html" class="active">Price-Per-Piece (Lego Store)</a>
-                <a href="part-out-value.html">Part-Out-Value</a>
+                <a href="index.html">Price-Per-Piece (Lego Store)</a>
+                <a href="part-out-value.html" class="active">Part-Out-Value</a>
                 <a href="advanced.html">Advanced</a>
             </div>
             <div class="nav-right">
                 <a href="about.html">About</a>
-                <div class="account-menu" id="account-menu" style="display: none;">
-                <div class="account-icon" id="account-icon">👤</div>
-                <div class="account-dropdown" id="account-dropdown">
-                    <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e9ecef; font-weight: 500;">
-                        <div id="account-email" style="font-size: 0.9rem; color: #666;"></div>
-                    </div>
-                    <button id="logout-menu-btn">Log Out</button>
-                    <hr>
-                    <button class="delete-account" id="delete-account-btn">Delete Account</button>
-                </div>
-            </div>
             </div>
         </nav>
     </header>
     
     <main>
-        <h1>Price-Per-Piece (Lego Store)</h1>
+        <h1>Part-Out-Value</h1>
         <div id="search-container-placeholder" style="margin-bottom: 1.5rem; display: none;">
             <div class="search-container">
                 <input type="text" id="search-input" class="search-input" placeholder="Search by set name..." value="">
@@ -53,6 +42,13 @@
                     <input type="checkbox" id="hide-na-toggle" checked>
                     <span>Hide NA data</span>
                 </label>
+                <label class="pov-period-selector">
+                    <span>POV Period:</span>
+                    <select id="pov-period-select" class="pov-period-select">
+                        <option value="current">Current Listings</option>
+                        <option value="past_6m">Past 6 Months</option>
+                    </select>
+                </label>
             </div>
         </div>
         <div id="data-container">
@@ -60,6 +56,6 @@
         </div>
     </main>
     
-    <script type="module" src="script.js"></script>
+    <script type="module" src="part-out-value.js"></script>
 </body>
 </html>

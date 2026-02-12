@@ -17,6 +17,8 @@
             window.supabaseReady = true;
         }
     </script>
+    <!-- Page view tracking -->
+    <script src="analytics.js"></script>
     <style>
         .premium-signup {
             max-width: 600px;
@@ -223,10 +225,14 @@
 <body>
     <header>
         <nav>
-            <a href="index.html">Home</a>
-            <a href="about.html">About</a>
-            <a href="advanced.html" class="active">Advanced</a>
-            <div class="account-menu" id="account-menu" style="display: none;">
+            <div class="nav-left">
+                <a href="index.html">Price-Per-Piece (Lego Store)</a>
+                <a href="part-out-value.html">Part-Out-Value</a>
+                <a href="advanced.html" class="active">Advanced</a>
+            </div>
+            <div class="nav-right">
+                <a href="about.html">About</a>
+                <div class="account-menu" id="account-menu" style="display: none;">
                 <div class="account-icon" id="account-icon">👤</div>
                 <div class="account-dropdown" id="account-dropdown">
                     <div style="padding: 0.75rem 1rem; border-bottom: 1px solid #e9ecef; font-weight: 500;">
@@ -236,6 +242,7 @@
                     <hr>
                     <button class="delete-account" id="delete-account-btn">Delete Account</button>
                 </div>
+            </div>
             </div>
         </nav>
     </header>
@@ -251,17 +258,13 @@
         <!-- Premium signup (shown for non-subscribers) -->
         <div id="premium-signup" style="display: none;" class="premium-signup">
             <h2>🔒 Premium Access Required</h2>
-            <p>Unlock advanced analytics, detailed insights, and exclusive data features with a premium subscription.</p>
+            <p>Subscribe to support my work!</p>
             
             <div class="pricing-card">
                 <h3>Premium Subscription</h3>
                 <div class="price">$9.99 <span>/month</span></div>
                 <ul class="features-list">
-                    <li>Access to advanced analytics dashboard</li>
-                    <li>Detailed set comparisons and trends</li>
-                    <li>Historical price tracking</li>
-                    <li>Premium data exports</li>
-                    <li>Priority support</li>
+                    <li>No additional features for now, but more coming soon!</li>
                 </ul>
                 <button id="subscribe-btn" class="subscribe-button">Subscribe Now</button>
             </div>

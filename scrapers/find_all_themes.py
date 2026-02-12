@@ -1,6 +1,7 @@
 import asyncio
 import os
 from typing import List, Dict, Any, Optional
+from bs4 import BeautifulSoup
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 import pandas as pd
@@ -14,7 +15,7 @@ MAX_PAGES_DEFAULT = 200
 
 BASE_URL = "https://www.lego.com/en-us/themes"
 
-from scrape_lego_overview import handle_age_gate, navigate_to_page, build_page_url
+from scrape_lego_overview import handle_age_gate
 
 # Import supabase_client
 try:
@@ -26,51 +27,64 @@ except ImportError:
     def upsert_themes(*args, **kwargs):
         return False
 
-# async def handle_age_gate(page) -> None:
-#     """Handle age gate"""
 
-#     if page is None:
-#         print("Page is None, exiting...")
-#         return
+def extract_theme_from_url(href: str) -> Optional[str]:
+    """Extract theme name from URL, returning None if invalid."""
+    if not href:
+        return None
     
-#     # Confirm age gate is present
-#     if 'age-gate' not in page.url:
-#         print("No age gate found, exiting...")
-#         return
+    theme_name = href.rstrip('/').split('/')[-1]
     
-#     for attempt in range(MAX_RETRY_ATTEMPTS):
-#         try:
+    # Skip if theme_name is empty or looks invalid
+    if not theme_name or theme_name in ['themes', 'en-us', '']:
+        return None
+    
+    # Skip if it's not a valid theme URL (should be a single word/slug)
+    if '?' in theme_name or '#' in theme_name or '=' in theme_name:
+        return None
+    
+    return theme_name
 
-#             continue_button = await page.wait_for_selector('button[data-test="age-gate-grown-up-cta"]', timeout=PAGE_LOAD_TIMEOUT)
 
-#             if not continue_button:
-#                 print("No continue button found, exiting...")
-#                 return
+def find_theme_elements(soup: BeautifulSoup) -> List:
+    """Find theme elements using multiple selector strategies."""
+    # First try the data-test attribute (most reliable)
+    theme_elements = soup.find_all('a', attrs={"data-test": "themes-link", "href": True})
+    
+    # If that doesn't work, try the class-based selector
+    if len(theme_elements) == 0:
+        print("No themes found with data-test selector, trying class-based selector...")
+        theme_elements = soup.find_all('a', attrs={"class": "sc-99390ee5-0 iqhEUq sc-c51a6d83-4 eZQczn", "href": True})
+    
+    # If still nothing, try a more generic selector (any link to /themes/)
+    if len(theme_elements) == 0:
+        print("No themes found with class selector, trying generic /themes/ link selector...")
+        all_links = soup.find_all('a', href=True)
+        theme_elements = [link for link in all_links if '/themes/' in link.get('href', '') and link.get('href', '').count('/') >= 4]
+    
+    return theme_elements
 
-#             print(f"Clicking age gate button {attempt + 1}/{MAX_RETRY_ATTEMPTS}")
-#             await continue_button.click(timeout=PAGE_LOAD_TIMEOUT, force=True)
 
-#             # Assumed success (No exception raised)
-#             print(f"Age gate button clicked {attempt + 1}/{MAX_RETRY_ATTEMPTS}!  Continuing...")
-#             await page.wait_for_timeout(WAIT_TIME_MEDIUM)
-#             break
-
-#         # If exception raised, retry up to MAX_RETRY_ATTEMPTS times
-#         except Exception as e:
-#             await page.wait_for_timeout(WAIT_TIME_MEDIUM)
-#             print(f"Retry {attempt + 1}/{MAX_RETRY_ATTEMPTS}: {e}")
-
-#     # If all retries fail, raise an error
-#     else:
-#         print(f"Failed to handle age gate after {MAX_RETRY_ATTEMPTS} attempts")
-        
-#         # write the html to a file for further inspection
-#         os.makedirs("html_files", exist_ok=True)
-#         with open(f"html_files/age_gate.html", "w", encoding='utf-8') as f:
-#             f.write(await page.content())
-#         print(f"HTML saved to html_files/age_gate.html for inspection")
-
-#         raise Exception(f"Failed to handle age gate after {MAX_RETRY_ATTEMPTS} attempts")
+async def check_cloudflare_block(content: str, page, context, browser) -> bool:
+    """Check if page is blocked by Cloudflare. Returns True if blocked."""
+    if 'cloudflare' in content.lower() and ('blocked' in content.lower() or 'sorry' in content.lower()):
+        print("❌ Cloudflare block page detected!")
+        print("   The site is actively blocking automated access.")
+        print("   Possible solutions:")
+        print("   1. Use a residential proxy service")
+        print("   2. Use a service like ScrapingBee or Bright Data")
+        print("   3. Run the scraper from a different IP/location")
+        print("   4. Contact LEGO.com to request API access")
+        # Still save the HTML for inspection
+        os.makedirs("html_files", exist_ok=True)
+        html_path = "html_files/cloudflare_block.html"
+        with open(html_path, "w", encoding='utf-8') as f:
+            f.write(content)
+        print(f"   Block page HTML saved to {html_path}")
+        await context.close()
+        await browser.close()
+        return True
+    return False
 
 
 async def handle_cookie_consent(page) -> None:
@@ -116,20 +130,6 @@ async def handle_cookie_consent(page) -> None:
 
 
 
-# def build_page_url(base_url: str, page_number: int) -> str:
-#     """Build URL for a specific page number"""
-
-#     # This checks if the URL already has a parameter or if it needs the page number to be the first parameter.
-#     if '?' in base_url:
-#         return f"{base_url}&page={page_number}"
-#     else:
-#         return f"{base_url}?page={page_number}"
-
-
-# async def navigate_to_page(page, url: str, timeout: int = PAGE_LOAD_TIMEOUT) -> None:
-#     """Navigate to a page with error handling"""
-#     await page.goto(url, timeout=timeout)
-#     await page.wait_for_timeout(WAIT_TIME_MEDIUM)
 
 
 async def find_all_themes() -> List[Dict[str, Any]]:
@@ -175,29 +175,6 @@ async def find_all_themes() -> List[Dict[str, Any]]:
 
 
 
-        # # Create context with realistic browser properties
-        # context = await browser.new_context(
-        #     viewport={'width': 1920, 'height': 1080},  # Realistic viewport
-        #     user_agent='Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',  # Updated, realistic UA
-        #     locale='en-US',
-        #     timezone_id='America/New_York',
-        #     permissions=['geolocation'],
-        #     geolocation={'latitude': 40.7128, 'longitude': -74.0060},  # NYC coordinates
-        #     color_scheme='light',
-        #     extra_http_headers={
-        #         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
-        #         'Accept-Language': 'en-US,en;q=0.9',
-        #         'Accept-Encoding': 'gzip, deflate, br',
-        #         'DNT': '1',
-        #         'Connection': 'keep-alive',
-        #         'Upgrade-Insecure-Requests': '1',
-        #         'Sec-Fetch-Dest': 'document',
-        #         'Sec-Fetch-Mode': 'navigate',
-        #         'Sec-Fetch-Site': 'none',
-        #         'Sec-Fetch-User': '?1',
-        #         'Cache-Control': 'max-age=0',
-        #     }
-        # )
         
         page = await context.new_page()
         
@@ -404,22 +381,7 @@ async def find_all_themes() -> List[Dict[str, Any]]:
             print(f"Content found! Content length: {len(content)}")
             
             # Check for Cloudflare block page
-            if 'cloudflare' in content.lower() and ('blocked' in content.lower() or 'sorry' in content.lower()):
-                print("❌ Cloudflare block page detected!")
-                print("   The site is actively blocking automated access.")
-                print("   Possible solutions:")
-                print("   1. Use a residential proxy service")
-                print("   2. Use a service like ScrapingBee or Bright Data")
-                print("   3. Run the scraper from a different IP/location")
-                print("   4. Contact LEGO.com to request API access")
-                # Still save the HTML for inspection
-                os.makedirs("html_files", exist_ok=True)
-                html_path = "html_files/cloudflare_block.html"
-                with open(html_path, "w", encoding='utf-8') as f:
-                    f.write(content)
-                print(f"   Block page HTML saved to {html_path}")
-                await context.close()
-                await browser.close()
+            if await check_cloudflare_block(content, page, context, browser):
                 return return_data  # Return empty, let the caller handle it
             
             # Check if we got a minimal/error page
@@ -438,40 +400,15 @@ async def find_all_themes() -> List[Dict[str, Any]]:
         soup = BeautifulSoup(content, "html.parser")
 
         # Find all the themes - try multiple selectors for robustness
-        # First try the data-test attribute (most reliable)
-        theme_elements = soup.find_all('a', attrs={"data-test": "themes-link", "href": True})
-        
-        # If that doesn't work, try the class-based selector
-        if len(theme_elements) == 0:
-            print("No themes found with data-test selector, trying class-based selector...")
-            theme_elements = soup.find_all('a', attrs={"class": "sc-99390ee5-0 iqhEUq sc-c51a6d83-4 eZQczn", "href": True})
-        
-        # If still nothing, try a more generic selector (any link to /themes/)
-        if len(theme_elements) == 0:
-            print("No themes found with class selector, trying generic /themes/ link selector...")
-            all_links = soup.find_all('a', href=True)
-            theme_elements = [link for link in all_links if '/themes/' in link.get('href', '') and link.get('href', '').count('/') >= 4]
-        
+        theme_elements = find_theme_elements(soup)
         print(f"Found {len(theme_elements)} theme elements")
 
         # Extract theme names, filtering out invalid ones
         for theme_element in theme_elements:
             href = theme_element.get('href', '')
-            if not href:
-                print(f"Skipping because no href")
-                continue
+            theme_name = extract_theme_from_url(href)
             
-            # Extract theme name from URL (e.g., /en-us/themes/star-wars -> star-wars)
-            theme_name = href.rstrip('/').split('/')[-1]
-            
-            # Skip if theme_name is empty or looks invalid
-            if not theme_name or theme_name in ['themes', 'en-us', '']:
-                print(f"Skipping invalid theme name: {theme_name} because it looks invalid")
-                continue
-            
-            # Skip if it's not a valid theme URL (should be a single word/slug)
-            if '?' in theme_name or '#' in theme_name or '=' in theme_name:
-                print(f"Skipping invalid theme name: {theme_name} because it contains invalid characters")
+            if not theme_name:
                 continue
             
             print(f"Found theme: {theme_name}")

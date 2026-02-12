@@ -5,22 +5,48 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>About - Lego Store Overview</title>
     <link rel="stylesheet" href="styles.css">
+    <!-- Pinned to specific version for security (check for updates regularly) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3"></script>
+    <script>
+        // Ensure Supabase is available globally
+        window.supabaseReady = false;
+        if (typeof supabase !== 'undefined') {
+            window.supabase = supabase;
+            window.supabaseReady = true;
+        }
+    </script>
+    <!-- Page view tracking -->
+    <script src="analytics.js"></script>
 </head>
 <body>
     <header>
         <nav>
-            <a href="index.html">Home</a>
-            <a href="about.html" class="active">About</a>
-            <a href="advanced.html">Advanced</a>
+            <div class="nav-left">
+                <a href="index.html">Price-Per-Piece (Lego Store)</a>
+                <a href="part-out-value.html">Part-Out-Value</a>
+                <a href="advanced.html">Advanced</a>
+            </div>
+            <div class="nav-right">
+                <a href="about.html" class="active">About</a>
+            </div>
         </nav>
     </header>
     
     <main>
         <h1>About</h1>
         <p>
-            Do you want to know what set is the best buy?  Has the cheapest price-per-piece?  Can be resold for the highest percentage of its retail price?  This is the place for you!
+            Do you want to know what set is the best buy?  Has the cheapest price-per-piece?  Can be resold for the highest percentage of its retail price?  Will make the most profit as an investment?
+            Dataweapons maintains updated lists of Lego set data, including price-per-piece, part-out-value, and other value metrics.
 
-            We are working to add more features soon, including an advanced tier with AI-powered analysis.  For now, enjoy the free tier data, and stay tuned for updates!
+            I'm working to add more features soon.  For now, enjoy the free data, and stay tuned for updates!
+
+            <br>
+            If you have any feedback or questions, you can contact me at <a href="mailto:charles.said25@gmail.com">charles.said25@gmail.com</a>.
+
+            <br>
+            This site is not affiliated with The Lego Group, Bricklink, or any affilates thereof.
+
+            This site contains affiliate links to support the site. I may earn a commission at no additional cost to you.
         </p>
     </main>
 </body>

@@ -24,6 +24,7 @@ html_files/
 .idea/
 *.swp
 *.swo
+*.sh
 
 # OS
 .DS_Store
