@@ -16,6 +16,9 @@ ENV/
 # CSV files (optional - uncomment if you don't want to track CSV files)
 *.csv
 
+# Script files (for uploading to S3, etc.)
+*.sh
+
 # HTML debug files
 html_files/
 

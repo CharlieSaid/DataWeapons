@@ -12,7 +12,7 @@ function getSessionId() {
     let sessionId = localStorage.getItem('analytics_session_id');
     if (!sessionId) {
         // Generate a simple session ID (not cryptographically secure, but good enough for analytics)
-        sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
         localStorage.setItem('analytics_session_id', sessionId);
         // Session expires after 30 minutes of inactivity
         localStorage.setItem('analytics_session_expiry', Date.now() + (30 * 60 * 1000));
@@ -21,7 +21,7 @@ function getSessionId() {
         const expiry = localStorage.getItem('analytics_session_expiry');
         if (expiry && Date.now() > parseInt(expiry)) {
             // Generate new session
-            sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+            sessionId = 'sess_' + Date.now() + '_' + Math.random().toString(36).substring(2, 11);
             localStorage.setItem('analytics_session_id', sessionId);
             localStorage.setItem('analytics_session_expiry', Date.now() + (30 * 60 * 1000));
         } else {

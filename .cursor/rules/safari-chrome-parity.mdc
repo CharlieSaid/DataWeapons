@@ -1,0 +1,46 @@
+---
+description: Safari and Chrome visual parity - ensure all changes render identically
+globs: website_files/**/*.{html,css,js}
+alwaysApply: false
+---
+
+# Safari / Chrome Parity
+
+This project must render **identically** in Safari and Chrome. Chrome is the reference; Safari often requires explicit handling.
+
+## CSS Checklist for New/Modified Styles
+
+### Form Controls
+- **Checkboxes/Radios**: Do NOT use `accent-color` alone. Use custom styling with `-webkit-appearance: none` + manual checkmark/state styles.
+- **Select dropdowns**: Add `-webkit-appearance: none; appearance: none` + custom arrow (background-image SVG). Native Safari select ignores `box-shadow`.
+- **Input placeholders**: Use both `::placeholder` and `::-webkit-input-placeholder`.
+- **Focus states**: Prefer `outline: none` + `box-shadow` for focus rings; test in both browsers.
+
+### Layout
+- **Flexbox gap**: Supported in Safari 14.1+. For older support, consider margin fallbacks.
+- **Table + border-radius**: Add `-webkit-backface-visibility: hidden` and border-radius on `thead th:first-child`, `th:last-child`, `tbody tr:last-child td:first-child`, `td:last-child` for proper Safari corner clipping.
+- **overflow: hidden + border-radius**: Safari can fail to clip; add `backface-visibility: hidden` or `isolation: isolate` to parent.
+
+### Colors and Backgrounds
+- **Header/child backgrounds**: Set `html { background-color: #fff }` so Safari renders child backgrounds correctly.
+- **Background shorthand**: Use both `background:` and `background-color:` for critical elements (e.g. header).
+- **Dark mode**: Add `<meta name="color-scheme" content="light">` to prevent Safari from tinting/overriding colors in system dark mode.
+
+### Typography and Interaction
+- **user-select**: Add `-webkit-user-select` alongside `user-select`.
+- **Links**: Use explicit `color` and `-webkit-tap-highlight-color` for consistent link styling.
+- **Transforms**: Include `-webkit-transform` where using `transform` (e.g. `rotate`, `translate`).
+
+## JavaScript Checklist
+
+- Avoid deprecated APIs: use `substring()` or `slice()` instead of `substr()`.
+- `requestIdleCallback`: Safari 15.4+. Provide fallback (e.g. `setTimeout`) for older Safari.
+
+## HTML Checklist
+
+- All pages: `<meta name="color-scheme" content="light">` in `<head>`.
+- New pages: Include the same meta tags as index.html for consistency.
+
+## Testing
+
+Before shipping: verify in both Safari and Chrome that new/changed UI matches the Chrome reference.

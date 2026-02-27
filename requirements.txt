@@ -2,8 +2,6 @@ beautifulsoup4==4.12.2
 requests==2.31.0
 pandas==3.0.0
 numpy==2.4.1
-matplotlib==3.7.2
-seaborn==0.12.2
 lxml==4.9.3
 supabase==2.27.2
 playwright==1.40.0
